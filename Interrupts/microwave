@@ -1,0 +1,306 @@
+
+#include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/gpio.h"
+#include "rom/gpio.h"
+
+#define HIGH    1
+#define LOW     0
+
+#define ONBOARD_LED 2 
+
+// Buttons
+#define START 34
+#define STOP 35
+#define ADD 32
+#define SUB 33
+#define OPENED 25
+#define CLOSED 26
+
+// 7 Segment
+#define g 23
+#define f 4
+#define a 5
+#define b 18
+#define e 19
+#define d 21
+#define c 22
+
+//conditions
+bool start = false;
+bool adding = false;
+bool subtract = false;
+bool opened;
+
+int timer;
+int temp;
+
+/*
+        23 4                 5 18
+		g f (220ohm to vcc) a b
+		| |     |           | |            a
+		---------------------            f    b
+		                                    g
+		                                 e     c
+		---------------------               d
+		|  |      |          | 
+		e  d (220ohm to gnd) c
+        19 21                22
+*/
+
+int countdown (int i)
+{
+		if(i==0)
+		{
+		  gpio_set_level(g,LOW);
+		  gpio_set_level(f,HIGH);
+		  gpio_set_level(a,HIGH);
+		  gpio_set_level(b,HIGH);
+		  gpio_set_level(e,HIGH);
+		  gpio_set_level(d,HIGH);
+		  gpio_set_level(c,HIGH);
+		  printf("0");
+		}
+		else if (i==1)
+		{
+		  gpio_set_level(g,LOW);
+		  gpio_set_level(f,LOW);
+		  gpio_set_level(a,LOW);
+		  gpio_set_level(b,HIGH);
+		  gpio_set_level(e,LOW);
+		  gpio_set_level(d,LOW);
+		  gpio_set_level(c,HIGH);
+		}
+		else if (i==2)
+		{
+		  gpio_set_level(g,HIGH);
+		  gpio_set_level(f,LOW);
+		  gpio_set_level(a,HIGH);
+		  gpio_set_level(b,HIGH);
+		  gpio_set_level(e,HIGH);
+		  gpio_set_level(d,HIGH);
+		  gpio_set_level(c,LOW);
+		}
+		
+		else if (i==3)
+		{
+		  gpio_set_level(g,HIGH);
+		  gpio_set_level(f,LOW);
+		  gpio_set_level(a,HIGH);
+		  gpio_set_level(b,HIGH);
+		  gpio_set_level(e,LOW);
+		  gpio_set_level(d,HIGH);
+		  gpio_set_level(c,HIGH);
+		}
+		else if (i==4)
+		{
+		  gpio_set_level(g,HIGH);
+		  gpio_set_level(f,HIGH);
+		  gpio_set_level(a,LOW);
+		  gpio_set_level(b,HIGH);
+		  gpio_set_level(e,LOW);
+		  gpio_set_level(d,LOW);
+		  gpio_set_level(c,HIGH);
+		}
+		else if (i==5)
+		{
+		  gpio_set_level(g,HIGH);
+		  gpio_set_level(f,HIGH);
+		  gpio_set_level(a,HIGH);
+		  gpio_set_level(b,LOW);
+		  gpio_set_level(e,LOW);
+		  gpio_set_level(d,HIGH);
+		  gpio_set_level(c,HIGH);
+		}
+		else if (i==6)
+		{
+		  gpio_set_level(g,HIGH);
+		  gpio_set_level(f,HIGH);
+		  gpio_set_level(a,LOW);
+		  gpio_set_level(b,LOW);
+		  gpio_set_level(e,HIGH);
+		  gpio_set_level(d,HIGH);
+		  gpio_set_level(c,HIGH);
+		}
+		else if (i==7)
+		{
+		  gpio_set_level(g,LOW);
+		  gpio_set_level(f,HIGH);
+		  gpio_set_level(a,HIGH);
+		  gpio_set_level(b,HIGH);
+		  gpio_set_level(e,LOW);
+		  gpio_set_level(d,LOW);
+		  gpio_set_level(c,HIGH);
+		}
+		else if (i==8)
+		{
+		  gpio_set_level(g,HIGH);
+		  gpio_set_level(f,HIGH);
+		  gpio_set_level(a,HIGH);
+		  gpio_set_level(b,HIGH);
+		  gpio_set_level(e,HIGH);
+		  gpio_set_level(d,HIGH);
+		  gpio_set_level(c,HIGH);
+
+		}
+		else if (i==9)
+		{
+		  gpio_set_level(g,HIGH);
+		  gpio_set_level(f,HIGH);
+		  gpio_set_level(a,HIGH);
+		  gpio_set_level(b,HIGH);
+		  gpio_set_level(e,LOW);
+		  gpio_set_level(d,LOW);
+		  gpio_set_level(c,HIGH);
+		}
+		
+		else
+		{
+		  gpio_set_level(g,LOW);
+		  gpio_set_level(f,LOW);
+		  gpio_set_level(a,LOW);
+		  gpio_set_level(b,LOW);
+		  gpio_set_level(e,LOW);
+		  gpio_set_level(d,LOW);
+		  gpio_set_level(c,LOW);
+		}
+	return 0;
+}
+static void IRAM_ATTR start_timer(void *arg)
+{
+	start = true;
+	opened = false;	     
+    gpio_isr_handler_add(START, start_timer, NULL);
+    gpio_intr_enable(START);
+}
+static void IRAM_ATTR add_timer(void *arg)
+{
+    adding = true;
+     
+			if(adding==true)
+			{
+				timer ++;
+			}
+	    
+    gpio_isr_handler_add(ADD, add_timer, NULL);
+    gpio_intr_enable(ADD);
+}
+static void IRAM_ATTR sub_timer(void *arg)
+{
+    subtract = true;
+     
+			if(subtract==true)
+			{
+				timer --;
+			}
+	    
+    gpio_isr_handler_add(SUB, sub_timer, NULL);
+    gpio_intr_enable(SUB);
+}
+static void IRAM_ATTR door_timer(void *arg)
+{
+    opened = true;
+    
+    gpio_set_level(ONBOARD_LED, HIGH);
+	    
+    gpio_isr_handler_add(OPENED, door_timer, NULL);
+    gpio_intr_enable(OPENED);
+}
+static void IRAM_ATTR closed_timer(void *arg)
+{
+    opened = false;
+    gpio_set_level(ONBOARD_LED, LOW);
+	    
+    gpio_isr_handler_add(CLOSED, closed_timer, NULL);
+    gpio_intr_enable(CLOSED);
+}
+void app_main(void)
+{
+	// on board led as microwave door output
+	esp_rom_gpio_pad_select_gpio(ONBOARD_LED);
+    gpio_set_direction(ONBOARD_LED, GPIO_MODE_OUTPUT);
+    
+    // 7 segments as output
+	gpio_set_direction(g, GPIO_MODE_OUTPUT);
+	gpio_set_direction(f, GPIO_MODE_OUTPUT);
+	gpio_set_direction(a, GPIO_MODE_OUTPUT);
+	gpio_set_direction(b, GPIO_MODE_OUTPUT);
+	gpio_set_direction(e, GPIO_MODE_OUTPUT);
+	gpio_set_direction(d, GPIO_MODE_OUTPUT);
+	gpio_set_direction(c, GPIO_MODE_OUTPUT);
+	
+  // Internal LED
+  esp_rom_gpio_pad_select_gpio(ONBOARD_LED);
+  gpio_set_direction(ONBOARD_LED, GPIO_MODE_OUTPUT);
+  
+    // Start button
+    gpio_reset_pin(START);
+    gpio_set_direction(START, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(START, GPIO_PULLDOWN_ONLY);
+    gpio_set_intr_type(START, GPIO_INTR_POSEDGE);
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(START, start_timer, NULL);
+    gpio_intr_enable(START);
+    
+    //  Stop interrupt
+    gpio_set_direction(STOP, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(STOP, GPIO_PULLDOWN_ONLY);
+    
+    //  Add interrupt
+    gpio_reset_pin(ADD);
+    gpio_set_direction(ADD, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(ADD, GPIO_PULLDOWN_ONLY);
+    gpio_set_intr_type(ADD, GPIO_INTR_POSEDGE);
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(ADD, add_timer, NULL);
+    gpio_intr_enable(ADD);
+    
+    //  Subtract interrupt
+    gpio_reset_pin(SUB);
+    gpio_set_direction(SUB, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(SUB, GPIO_PULLDOWN_ONLY);
+    gpio_set_intr_type(SUB, GPIO_INTR_POSEDGE);
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(SUB, sub_timer, NULL);
+    gpio_intr_enable(SUB);
+    
+    //  Door open interrupt
+    gpio_reset_pin(SUB);
+    gpio_set_direction(OPENED, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(OPENED, GPIO_PULLDOWN_ONLY);
+    gpio_set_intr_type(OPENED, GPIO_INTR_POSEDGE);
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(OPENED, door_timer, NULL);
+    gpio_intr_enable(OPENED);
+    
+    //  Door closed interrupt
+    gpio_reset_pin(CLOSED);
+    gpio_set_direction(CLOSED, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(CLOSED, GPIO_PULLDOWN_ONLY);
+    gpio_set_intr_type(CLOSED, GPIO_INTR_POSEDGE);
+    gpio_install_isr_service(0);
+    gpio_isr_handler_add(CLOSED, closed_timer, NULL);
+    gpio_intr_enable(CLOSED);
+    
+    while(1)
+{
+	if((start==true)&&(opened==false))
+		{
+		   for(timer=9; timer>=0; timer--)
+			{
+			  vTaskDelay(100); //1 seconds
+			  printf("%d\n",timer);
+			  countdown(timer);
+			  if(gpio_get_level(STOP)==1)
+			  {
+				  break;
+			  }
+			  if(opened==true)
+			  {
+				  break;
+			  }
+			}
+		}
+}
+}
