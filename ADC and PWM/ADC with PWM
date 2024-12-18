@@ -1,1 +1,95 @@
+#include <stdio.h>
+#include "hal/gpio_types.h"
+#include "hal/ledc_types.h"
+#include "sdkconfig.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include <driver/ledc.h>
+#include <driver/adc.h>
+#include "driver/gpio.h"
+#include "rom/gpio.h"
+#include "hal/gpio_ll.h"
+#include "esp_err.h"
 
+/* #define LEDs and buttons as needed
+ You need to use 1ULL<LED or 1ULL<BUTTON
+ ULL (unsigned long long) is an 8 bytes data type and the GPIO pins need to be set to ULL because gpio_config_t pin_bit_mask is an uint64_t. */
+#define Max_Duty 4096
+
+int count = 0;
+static QueueHandle_t Duty_Cycle = NULL;
+
+/* ADC Task */
+void ADCtask(void *pvParameter)
+{
+	while(1)
+	{
+		int adcReading = adc1_get_raw(ADC1_CHANNEL_6); // Pin34  
+        vTaskDelay(100/portTICK_PERIOD_MS); /* 100 ms */
+        xQueueSend(Duty_Cycle, &adcReading, 0);		
+	}
+}
+
+/* PWM Task Receive */
+void PWMtask(void *pvParameter)
+{
+	int adcReading;
+	while(1)
+	{
+		//Task1
+        if(xQueueReceive(Duty_Cycle, &adcReading, (TickType_t)100) == pdPASS)
+        {
+            printf("ADC Value: %d\n", adcReading);/* Print reading */ 
+            ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, adcReading);
+            ledc_update_duty(LEDC_LOW_SPEED_MODE,LEDC_CHANNEL_0);
+            vTaskDelay(10/portTICK_PERIOD_MS);         
+        }
+
+	}
+}
+
+void setADC()
+{
+	adc1_config_width(ADC_WIDTH_BIT_12); /*Set the ADC with width of 12 bits -> 2^12 = 4096*/
+	adc1_config_channel_atten(ADC1_CHANNEL_6 , ADC_ATTEN_DB_11); /*Set to any channel and at any attenuation */
+}
+
+void setPWM()
+{
+   /*Set LEDC Timer */ 
+	ledc_timer_config_t timerConfig;
+    timerConfig.duty_resolution = LEDC_TIMER_8_BIT; //13 BIT
+    timerConfig.timer_num = LEDC_TIMER_0;            // TIMER_1
+    timerConfig.freq_hz = 5000;                     //5000hz
+    timerConfig.speed_mode = LEDC_LOW_SPEED_MODE;   //LOW_SPEED
+    timerConfig.clk_cfg = LEDC_AUTO_CLK;            //AUTO_CLK
+    ledc_timer_config(&timerConfig);
+
+	/* Set LEDC Channel */
+	ledc_channel_config_t tChaConfig;
+    tChaConfig.gpio_num = 14;    
+    tChaConfig.speed_mode = LEDC_LOW_SPEED_MODE;   // LOW_SPEED
+    tChaConfig.channel = LEDC_CHANNEL_0;          
+    tChaConfig.intr_type = LEDC_INTR_DISABLE;      //INTERRUPT_DISABLE
+    tChaConfig.timer_sel = LEDC_TIMER_0;          // TIMER_1
+    tChaConfig.duty = 0;                          // 0 duty
+    tChaConfig.hpoint = 0;                 // Max duty
+    ledc_channel_config(&tChaConfig);
+    ledc_fade_func_install(0);
+}
+
+void app_main()
+{
+	setADC();
+	setPWM();
+	
+	
+	
+	Duty_Cycle = xQueueCreate(10, sizeof(int)); /* Creating Queue */
+	
+	/* Create Tasks */
+	xTaskCreate(&ADCtask, "ADCtask", 2048, NULL, 5, NULL); 
+	xTaskCreate(&PWMtask, "PWMtask", 2048, NULL, 5, NULL);
+
+}
