@@ -1,1 +1,89 @@
+#include <stdio.h>
+#include "sdkconfig.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "driver/gpio.h"
+#include "rom/gpio.h"
+#include "hal/gpio_ll.h"
+ 
+#define ESP_INTR_FLAG_DEFAULT 0 /* Interrupt flag configuration */
+ 
+#define LOW     0   /* low logic  */
+#define HIGH    1   /* high logic */
+ 
+#define ONBOARD_LED     2    
+#define LED    14   /* external led pin  */
+#define BUTTON          34   /* button pin  */
+ 
+ static QueueHandle_t Queue = NULL;
+ 
+/* GPIO interrupt handler */
+static void IRAM_ATTR gpio_isr_handler(void* arg)
+{
+	GPIO.out ^= BIT2; /* toggle LED (here 14, choose any gpio) */
+    uint32_t gpio_num = (uint32_t)arg; /* store argument into gpio_num */
+    xQueueSendFromISR(Queue,&gpio_num,NULL);
 
+}
+ /* Print Task */
+static void print_task(void* arg)
+{
+   int gpio_num; // store queue
+   while(1)
+   {
+	   if(xQueueReceive(Queue, &gpio_num, (TickType_t)200) == pdPASS)
+        {
+            printf("GPIO[%d] caused an interrupt\n", gpio_num); 
+            //vTaskDelay(100/portTICK_PERIOD_MS);
+        }
+   }
+
+}
+void app_main()
+{
+ 
+    /* IO configuration */
+    gpio_config_t io_conf;
+    
+    /* Input configuration */
+    io_conf.intr_type = GPIO_INTR_NEGEDGE;  /* Set up as Positive Edge */ 
+    io_conf.mode = GPIO_MODE_INPUT;     /* Set pins as input */
+    io_conf.pin_bit_mask = (1ULL << BUTTON);  /* Add input bit mask */
+    io_conf.pull_down_en = 1;   /* Enable pulldown */
+    io_conf.pull_up_en = 0;     /* Disable pullup */
+ 
+    /* Set configuration */
+    gpio_config(&io_conf);
+ 
+    /* Output configuration */
+    io_conf.intr_type = GPIO_INTR_DISABLE;  /* Disable interrupt */
+    io_conf.mode = GPIO_MODE_OUTPUT;        /* Set as output*/
+    io_conf.pin_bit_mask = (1ULL << ONBOARD_LED) | (1ULL << LED); /* Add output bit mask */
+    io_conf.pull_down_en = 0;   /* Disable pulldown */
+    io_conf.pull_up_en = 0;     /* Disable pullup */
+ 
+    /* Set configuration */
+    gpio_config(&io_conf);
+ 
+    /* Set default interrupt flag */
+    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+ 
+    /* Add ISR handler */
+    gpio_isr_handler_add(BUTTON, gpio_isr_handler, (void*) BUTTON); 
+    
+    /* Create Tasks */
+    Queue = xQueueCreate(10,sizeof(uint32_t));
+    xTaskCreate(&print_task, "print task", 2048, NULL, 10, NULL);
+    
+ 
+    while(1)
+    {
+         gpio_set_level(LED, HIGH);
+         vTaskDelay(500/portTICK_PERIOD_MS); // .5 second delay 
+         gpio_set_level(LED,LOW);
+         vTaskDelay(500/portTICK_PERIOD_MS);//  .5 second delay 
+         printf("Doing Work\n");
+    }
+ 
+}
