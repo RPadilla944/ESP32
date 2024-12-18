@@ -1,1 +1,59 @@
 
+#include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/gpio.h"
+#include "rom/gpio.h"
+
+#define HIGH    1
+#define LOW     0
+
+void app_main(void)
+{
+	//LED GPIO
+	gpio_pad_select_gpio(12);
+	gpio_pad_select_gpio(14);
+	gpio_pad_select_gpio(26);
+	gpio_pad_select_gpio(27);
+	//LED OUTPUTS
+	gpio_set_direction(12, GPIO_MODE_DEF_OUTPUT);
+	gpio_set_direction(14, GPIO_MODE_DEF_OUTPUT);
+	gpio_set_direction(26, GPIO_MODE_DEF_OUTPUT);
+	gpio_set_direction(27, GPIO_MODE_DEF_OUTPUT);
+	//BUTTON 
+	gpio_pad_select_gpio(34);
+	//BUTTON AS INPUT
+	gpio_set_direction(34, GPIO_MODE_INPUT);
+	//BUTTON AS PULLDOWN MODE (POWER BOTTON THE RESISTOR)
+	gpio_set_pull_mode(34, GPIO_PULLDOWN_ONLY); /* set as pull-down */
+	
+	uint8_t randomarray[] = {12, 14, 27, 26}; //Define Port numbers to use. 
+	
+	int i,j;
+	
+while(1)
+{
+	if(gpio_get_level(34)==1)
+	{
+		for(i=0; i<4; i++)
+		{
+				//Let's try turning on/off an LED
+				gpio_set_level(randomarray[i], HIGH);
+				gpio_set_level(randomarray[i+2], HIGH);
+							vTaskDelay(100); //1 seconds
+				gpio_set_level(randomarray[i], LOW);
+				gpio_set_level(randomarray[i+2], LOW);
+	    }
+	    for(j=3; j>=0; j--)
+	    {
+					//Let's try turning on/off an LED
+				gpio_set_level(randomarray[j], HIGH);
+				gpio_set_level(randomarray[j-2], HIGH);
+							vTaskDelay(100); //1 seconds
+				gpio_set_level(randomarray[j], LOW);
+				gpio_set_level(randomarray[j-2], LOW);	
+		}
+	}
+
+}
+}
