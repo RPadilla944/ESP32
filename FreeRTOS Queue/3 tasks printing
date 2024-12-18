@@ -1,1 +1,87 @@
+#include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
 
+//Global Queue handle
+QueueHandle_t Queue;
+QueueHandle_t Queue2;
+QueueHandle_t Queue3;
+ 
+//task 1 
+void Send_10(void *pvParameters)
+{
+
+    int data = 10;
+    while(1)
+    {
+        xQueueSendToBack(Queue, &data, 0);
+        vTaskDelay(1000/portTICK_PERIOD_MS);// 1 sec. delay
+    }
+}
+//task 2 
+void Send_20(void *pvParameters)
+{
+
+    int data2 = 20;
+    while(1)
+    {
+        xQueueSendToBack(Queue2, &data2, 0);
+        vTaskDelay(1500/portTICK_PERIOD_MS);// 1.5 sec. delay
+    }
+}
+//task 3 
+void Send_Str(void *pvParameters)
+{
+
+   char data3[]="EE4178";
+    while(1)
+    {
+        xQueueSendToBack(Queue3, &data3, 0);
+        vTaskDelay(100/portTICK_PERIOD_MS);// 1 sec. delay
+    }
+} 
+//****************************************************************************************************************************/
+//task 4 receiver
+void Get_Tasks(void *pvParameters){
+    /* variable to store data */
+    int storeData;
+    char storedData3[8];
+    while(1)
+    {
+        //Task1
+        if(xQueueReceive(Queue, &storeData, (TickType_t)100) == pdPASS)
+        {
+            printf("Data receive from task 1: %d\n", storeData); 
+            vTaskDelay(100/portTICK_PERIOD_MS);
+        }
+           //Task 2
+        if(xQueueReceive(Queue2, &storeData, (TickType_t)100) == pdPASS)
+        {
+            printf("Data receive from task 2: %d\n", storeData); 
+            vTaskDelay(100/portTICK_PERIOD_MS);
+        }     
+            //Task 3
+        if(xQueueReceive(Queue3, &storedData3, (TickType_t)200) == pdPASS)
+        {
+            printf("Data receive from task 3: %s\n", storedData3); 
+            vTaskDelay(100/portTICK_PERIOD_MS);
+        }
+              vTaskDelay(1000/portTICK_PERIOD_MS); // 500 ms delay  
+    }
+}
+ 
+void app_main(void)
+{
+    //queue of size 5
+    Queue = xQueueCreate(5, sizeof(int));
+    Queue2 = xQueueCreate(5, sizeof(int));
+    Queue3 = xQueueCreate(5, 10);
+    
+    //tasks
+    xTaskCreate(&Send_10, "Send 10", 2048, NULL, 4, NULL);
+    xTaskCreate(&Send_20, "Send 20", 2048, NULL, 4, NULL);
+    xTaskCreate(&Send_Str, "Send str", 2048, NULL, 5, NULL);
+    xTaskCreate(&Get_Tasks, "Get_Tasks", 2048, NULL, 4, NULL);
+    
+}
