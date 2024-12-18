@@ -1,1 +1,4 @@
-
+           RX		TX
+   UART0 : GPIO3 	GPIO1
+   UART1 : GPIO9 	GPIO10
+   UART2 : GPIO16 	GPIO17
